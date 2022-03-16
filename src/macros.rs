@@ -179,6 +179,85 @@ macro_rules! blake2_impl {
                 h[0] = h[0] ^ (v[0] ^ v[2]);
                 h[1] = h[1] ^ (v[1] ^ v[3]);
             }
+
+            /// For evm computation.
+            pub fn f(r: u32, h: [$word; 8], m: [$word; 16], t: [$word; 2], f: bool) -> GenericArray<u8, $bytes> {
+                use $crate::consts::SIGMA;
+
+                #[inline(always)]
+                fn quarter_round(v: &mut [$vec; 4], rd: u32, rb: u32, m: $vec) {
+                    v[0] = v[0].wrapping_add(v[1]).wrapping_add(m.from_le());
+                    v[3] = (v[3] ^ v[0]).rotate_right_const(rd);
+                    v[2] = v[2].wrapping_add(v[3]);
+                    v[1] = (v[1] ^ v[2]).rotate_right_const(rb);
+                }
+
+                #[inline(always)]
+                fn shuffle(v: &mut [$vec; 4]) {
+                    v[1] = v[1].shuffle_left_1();
+                    v[2] = v[2].shuffle_left_2();
+                    v[3] = v[3].shuffle_left_3();
+                }
+
+                #[inline(always)]
+                fn unshuffle(v: &mut [$vec; 4]) {
+                    v[1] = v[1].shuffle_right_1();
+                    v[2] = v[2].shuffle_right_2();
+                    v[3] = v[3].shuffle_right_3();
+                }
+
+                #[inline(always)]
+                fn round(v: &mut [$vec; 4], m: &[$word; 16], s: &[usize; 16]) {
+                    quarter_round(v, $R1, $R2, $vec::gather(m, s[0], s[2], s[4], s[6]));
+                    quarter_round(v, $R3, $R4, $vec::gather(m, s[1], s[3], s[5], s[7]));
+
+                    shuffle(v);
+                    quarter_round(v, $R1, $R2, $vec::gather(m, s[8], s[10], s[12], s[14]));
+                    quarter_round(v, $R3, $R4, $vec::gather(m, s[9], s[11], s[13], s[15]));
+                    unshuffle(v);
+                }
+
+                #[inline(always)]
+                fn iv0() -> $vec {
+                    $vec::new($IV[0], $IV[1], $IV[2], $IV[3])
+                }
+                #[inline(always)]
+                fn iv1() -> $vec {
+                    $vec::new($IV[4], $IV[5], $IV[6], $IV[7])
+                }
+                #[inline(always)]
+                fn copy(src: &[u8], dst: &mut [u8]) {
+                    assert!(dst.len() >= src.len());
+                    unsafe {
+                        core::ptr::copy_nonoverlapping(src.as_ptr(), dst.as_mut_ptr(), src.len());
+                    }
+                }
+
+                let mut h: [$vec; 2] = [
+                    $vec::new(h[0], h[1], h[2], h[3]),
+                    $vec::new(h[4], h[5], h[6], h[7]),
+                ];
+    
+                let (f0, f1) = if f { (!0, 0) } else { (0, 0) };
+    
+                let (t0, t1) = (t[0], t[1]);
+    
+                let mut v = [h[0], h[1], iv0(), iv1() ^ $vec::new(t0, t1, f0, f1)];
+    
+                for x in 1..r + 1 {
+                    let x = if x > 10 { x - 11 } else { x - 1 };
+                    round(&mut v, &m, &SIGMA[x as usize]);
+                }
+    
+                h[0] = h[0] ^ (v[0] ^ v[2]);
+                h[1] = h[1] ^ (v[1] ^ v[3]);
+    
+                let buf = [h[0].to_le(), h[1].to_le()];
+                let mut out = GenericArray::default();
+                copy(buf.as_bytes(), &mut out);
+    
+                out
+            }
         }
 
         impl HashMarker for $name {}

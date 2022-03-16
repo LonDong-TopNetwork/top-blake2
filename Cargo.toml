@@ -1,14 +1,14 @@
 [package]
-name = "blake2"
-version = "0.10.4" # Also update html_root_url in lib.rs when bumping this
+name = "top-blake2"
+version = "0.10.5" # Also update html_root_url in lib.rs when bumping this
 description = "BLAKE2 hash functions"
-authors = ["RustCrypto Developers"]
+authors = ["telosprotocol"]
 license = "MIT OR Apache-2.0"
 readme = "README.md"
 edition = "2018"
 documentation = "https://docs.rs/blake2"
-repository = "https://github.com/RustCrypto/hashes"
-keywords = ["crypto", "blake2", "hash", "digest"]
+repository = "https://github.com/LonDong-TopNetwork/top-blake2"
+keywords = ["blake2"]
 categories = ["cryptography", "no-std"]
 
 [dependencies]
